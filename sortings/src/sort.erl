@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author Elton
+%%% @author Florian Weiß
 %%% @copyright (C) 2019, <COMPANY>
 %%% @doc
 %%%
@@ -7,10 +7,16 @@
 %%% Created : 04. Apr 2019 19:54
 %%%-------------------------------------------------------------------
 -module(sort).
--author("Elton").
+-author("Florian Weiß").
 
 %% API
 -export([insertionS/1,qsort/3,hsort/1,last/1,droplast/1]).
+
+%%%%%%%%%%%%%
+%%
+%% Insertion Sort
+%%
+%%%%%%%%%%%%%
 
 insertionS([]) ->
   [];
@@ -32,11 +38,17 @@ insert(Sorted,[H|T],Elem) ->
     true -> insert(Sorted++[H], T, Elem)
   end.
 
-qsort(_PivotMethod,[],_Change) ->
+%%%%%%%%%%%%%
+%%
+%% Quicksort
+%%
+%%%%%%%%%%%%%
+
+qsort(_PivotMethod,[],_Change) when _Change >= 0 ->
   [];
-qsort(_PivotMethod,[Single],_Change) ->
+qsort(_PivotMethod,[Single],_Change) when _Change >= 0 ->
   [Single];
-qsort(PivotMethod,List,Change) when length(List) > Change->
+qsort(PivotMethod,List,Change) when Change >= 0, length(List) > Change->
   [Pivot|T] = pivot(PivotMethod, List),
   qsort(PivotMethod,[X||X <- T, X < Pivot],Change) ++
     [Pivot] ++
@@ -44,7 +56,7 @@ qsort(PivotMethod,List,Change) when length(List) > Change->
 qsort(_PivotMethod,List,_Change) ->
   insertionS(List).
 
-pivot(PivotMethod,[H|_T] = List) ->
+pivot(PivotMethod,List) ->
   case PivotMethod of
     left -> List ;
     middle -> pmid(List);
@@ -52,7 +64,7 @@ pivot(PivotMethod,[H|_T] = List) ->
     median ->
       Mid = pmid(List),
       Right = pright(List),
-      pmed(H,Mid,Right,List);
+      pmed(List,Mid,Right);
     random -> prand(List)
   end
   .
@@ -76,53 +88,62 @@ prand(List) ->
   p_nth(rand:uniform(Len),List,[])
   .
 
-pmed(L,M,R,List) when L >= M, M >= R ->
-  pmid(List);
-pmed(L,M,R,List) when L >= R, R >= M ->
-  pright(List);
-pmed(L,M,R,List) when M >= R, R >= L ->
-  pright(List);
-pmed(L,M,R,List) when M >= L, L >= R->
+pmed([L|_LT]=List,[M|_MT],[R|_RT]) when L >= M, L >= R ->
   List;
-pmed(L,M,R,List) when R >= L, L >= M ->
+pmed([L|_LT],[M|_MT],[R|_RT]=List) when R >= L, R >= M ->
   List;
-pmed(L,M,R,List) when R >= M, M >= L ->
-  pmid(List).
+pmed([L|_LT],[M|_MT]=List,[R|_RT]) when M >= R, M >= L ->
+  List.
+
+%%%%%%%%%%%%%
+%%
+%% Heap Sort
+%%
+%%%%%%%%%%%%%
 
 hsort(List) ->
   Heap = buildMaxHeap(List,{1,{}}),
   heapToList(Heap,[]).
 
+%%%%%%%%%%%%%
+%%
+%% Funktionen für die Erzeugung des Heaps
+%%
+%%%%%%%%%%%%%
+
 buildMaxHeap([],Heap) ->
   Heap;
 buildMaxHeap([H|Tail],Heap) ->
-buildMaxHeap(Tail,addLeaf(H,Heap)).
+buildMaxHeap(Tail,insertLeaf(H,Heap)).
 
-addLeaf(Elem,{Number,Heap}) ->
-  {Number+1,addLeaf(calcPath(Number),Heap,Elem)}.
+insertLeaf(Elem,{Number,Heap}) ->
+  {Number+1,insertLeaf(calcPath(Number),Heap,Elem)}.
 
-addLeaf(_,{},Elem) ->
+insertLeaf(_,{},Elem) ->
   {Elem};
-addLeaf(_D,{Parent},Elem) ->
-  insertLeft({Parent,{Elem},{}});
-addLeaf([l|Path],{Parent,Left,Right},Elem) ->
-  insertLeft({Parent,addLeaf(Path,Left,Elem),Right});
-addLeaf([r|Path],{Parent,Left,Right},Elem) ->
-  insertRight({Parent,Left,addLeaf(Path,Right,Elem)}).
+insertLeaf(_,{Parent},Elem) ->
+  reHeap_up({Parent,{Elem},{}});
+insertLeaf([l|Path],{Parent,Left,Right},Elem) ->
+  reHeap_up({Parent,insertLeaf(Path,Left,Elem),Right});
+insertLeaf([r|Path],{Parent,Left,Right},Elem) ->
+  reHeap_up({Parent,Left,insertLeaf(Path,Right,Elem)}).
 
-insertLeft({Parent,{LI},R}) when Parent < LI ->
+reHeap_up({Parent,{LI},R}) when Parent < LI ->
   {LI,{Parent},R};
-insertLeft({Parent,{LI,LL,LR},R}) when Parent < LI ->
+reHeap_up({Parent,{LI,LL,LR},R}) when Parent < LI ->
   {LI,{Parent,LL,LR},R};
-insertLeft(X) ->
-  X.
-
-insertRight({Parent,L,{RI}}) when Parent < RI ->
+reHeap_up({Parent,L,{RI}}) when Parent < RI ->
   {RI,L,{Parent}};
-insertRight({Parent,L,{RI,RL,RR}}) when Parent < RI ->
+reHeap_up({Parent,L,{RI,RL,RR}}) when Parent < RI ->
   {RI,L,{Parent,RL,RR}};
-insertRight(X) ->
-  X.
+reHeap_up(Heap) ->
+  Heap.
+
+%%%%%%%%%%%%%
+%%
+%% Funktionen für den Sortiervorgang von Heap zur Liste
+%%
+%%%%%%%%%%%%%
 
 heapToList({_,{}},Sorted) ->
   Sorted;
@@ -133,13 +154,8 @@ heapToList(Heap,Sorted) ->
 swap({2,{Elem}}) ->
   {Elem,{0,{}}};
 swap({_,{Parent,_,_}}=Heap) ->
-  {{NumberNew,HeapNew},Elem} = getHeapEnd(Heap),
-  {Parent,{NumberNew,siftDown(setNewRoot(HeapNew,Elem))}}.
-
--define(v_(H,Tag),(case size(H) of
-                     0 -> {0,none};
-                     _ -> {element(1,H),Tag}
-                   end)).
+  {{NumberNew,HeapNew},Elem} = pop(Heap),
+  {Parent,{NumberNew,siftDown(push(HeapNew,Elem))}}.
 
 siftDown({Parent}) ->
   {Parent};
@@ -168,25 +184,33 @@ getMax([{P,_},{L,_},{R,_}=RT]) when R >= L, R >= P ->
 getMax([{P,_},{L,_}=LT,{R,_}]) when L >= R, L >= P ->
   LT.
 
-getHeapEnd({Number,Heap}) ->
-  {Heap1,Elem} = getHeapEnd(calcPath(Number-1),Heap),
+pop({Number,Heap}) ->
+  {Heap1,Elem} = pop(calcPath(Number-1),Heap),
   {{Number-1,Heap1},Elem}.
 
-getHeapEnd(_,{Elem}) ->
+pop(_,{Elem}) ->
   {{},Elem};
-getHeapEnd(_,{Parent,{Elem},{}}) ->
+pop(_,{Parent,{Elem},{}}) ->
   {{Parent},Elem};
-getHeapEnd([l|Path],{Parent,L,R}) ->
-  {L1,Elem} = getHeapEnd(Path,L),
+pop([l|Path],{Parent,L,R}) ->
+  {L1,Elem} = pop(Path,L),
   {{Parent,L1,R},Elem};
-getHeapEnd([r|D],{Parent,L,R}) ->
-  {R1,Elem} = getHeapEnd(D,R),
+pop([r|Path],{Parent,L,R}) ->
+  {R1,Elem} = pop(Path,R),
+  {R1,Elem} = pop(Path,R),
   {{Parent,L,R1},Elem}.
 
-setNewRoot({_P},Elem) ->
+push({_P},Elem) ->
   {Elem};
-setNewRoot({_P,L,R},Elem) ->
+push({_P,L,R},Elem) ->
   {Elem,L,R}.
+
+%%%%%%%%%%%%%
+%%
+%% Funktion für die Bestimmungen des Pfades
+%% Bereitgestellt von Prof. Klauck
+%%
+%%%%%%%%%%%%%
 
 calcPath(Number) ->
   calcPath(Number,[]).
@@ -198,7 +222,9 @@ calcPath(Number,Accu) when Number rem 2 =/= 0 ->
   calcPath((Number-1) div 2,[r|Accu]).
 
 %%%%%%%%%%%%%%%%%%%%%%
-%% Selbst geschriebene Versionen von build in functions
+%% Selbst geschriebene Versionen von build in Kunktionen,
+%% sowie kleinere Abwandlungen zur Bereitstellung bei den oben
+%% entwickelten Funktionen
 %%%%%%%%%%%%%%%%%%%%%%
 
 
