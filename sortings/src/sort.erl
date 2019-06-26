@@ -28,15 +28,14 @@ insertionS([H|L]) ->
 insertionS(Sorted,[]) ->
   Sorted;
 insertionS(Sorted, [H|T]) ->
-  insertionS(insert([],Sorted,H), T).
+  insertionS(insert(Sorted,H), T).
 
-insert(Sorted,[],Elem) ->
-  Sorted++[Elem];
-insert(Sorted,[H|T],Elem) ->
-  if
-    Elem =< H -> Sorted++[Elem]++[H]++T;
-    true -> insert(Sorted++[H], T, Elem)
-  end.
+insert([],Elem) ->
+  [Elem];
+insert([H|_T]=Sorted,Elem) when Elem =< H ->
+  [Elem|Sorted];
+insert([H|T],Elem) ->
+  [H|insert(T,Elem)].
 
 %%%%%%%%%%%%%
 %%
@@ -44,9 +43,9 @@ insert(Sorted,[H|T],Elem) ->
 %%
 %%%%%%%%%%%%%
 
-qsort(_PivotMethod,[],_Change) when _Change >= 0 ->
+qsort(_PivotMethod,[],_Change) ->
   [];
-qsort(_PivotMethod,[Single],_Change) when _Change >= 0 ->
+qsort(_PivotMethod,[Single],_Change) ->
   [Single];
 qsort(PivotMethod,List,Change) when Change >= 0, length(List) > Change->
   [Pivot|T] = pivot(PivotMethod, List),
@@ -167,22 +166,40 @@ siftDown({Parent,Left,{}=Right}=Heap) ->
     true ->
       {L,siftDown(setelement(1,Left,Parent)),Right}
   end;
-siftDown({Parent,Left,Right}=Heap) ->
-  case getMax([{Parent,top},{element(1,Left),l},{element(1,Right),r}]) of
-    {_,top} ->
+siftDown({Parent,{LP,LL,LR}=Left,{RP}=Right}=Heap) ->
+  case getMax([Parent,LP,RP]) of
+    Parent ->
       Heap;
-    {L,l} ->
-      {L,siftDown(setelement(1,Left,Parent)),Right};
-    {R,r} ->
-      {R,Left,siftDown(setelement(1,Right,Parent))}
+    LP ->
+      {LP,siftDown({Parent,LL,LR}),Right};
+    RP ->
+      {RP,Left,siftDown({Parent})}
+  end;
+siftDown({Parent,{LP}=Left,{RP}=Right}=Heap) ->
+  case getMax([Parent,LP,RP]) of
+    Parent ->
+      Heap;
+    LP ->
+      {LP,siftDown({Parent}),Right};
+    RP ->
+      {RP,Left,siftDown({Parent})}
+  end;
+siftDown({Parent,{LP,LL,LR}=Left,{RP,RL,RR}=Right}=Heap) ->
+  case getMax([Parent,LP,RP]) of
+    Parent ->
+      Heap;
+    LP ->
+      {LP,siftDown({Parent,LL,LR}),Right};
+    RP ->
+      {RP,Left,siftDown({Parent,RL,RR})}
   end.
 
-getMax([{P,_}=PT,{L,_},{R,_}]) when P >= L, P >= R ->
-  PT;
-getMax([{P,_},{L,_},{R,_}=RT]) when R >= L, R >= P ->
-  RT;
-getMax([{P,_},{L,_}=LT,{R,_}]) when L >= R, L >= P ->
-  LT.
+getMax([P,L,R]) when P >= L, P >= R ->
+  P;
+getMax([P,L,R]) when R >= L, R >= P ->
+  R;
+getMax([P,L,R]) when L >= R, L >= P ->
+  L.
 
 pop({Number,Heap}) ->
   {Heap1,Elem} = pop(calcPath(Number-1),Heap),
@@ -197,12 +214,11 @@ pop([l|Path],{Parent,L,R}) ->
   {{Parent,L1,R},Elem};
 pop([r|Path],{Parent,L,R}) ->
   {R1,Elem} = pop(Path,R),
-  {R1,Elem} = pop(Path,R),
   {{Parent,L,R1},Elem}.
 
-push({_P},Elem) ->
+push({_},Elem) ->
   {Elem};
-push({_P,L,R},Elem) ->
+push({_,L,R},Elem) ->
   {Elem,L,R}.
 
 %%%%%%%%%%%%%
